@@ -19,7 +19,19 @@ if str(ROOT) not in sys.path:
 
 from src.dataset import PlantSplitDataset, build_class_mapping, load_split_frame
 from src.evaluate import evaluate_loader
-from src.models import build_model
+from src.features import (
+    extract_features,
+    feature_loader,
+    load_feature_bank,
+    save_feature_bank,
+    train_linear_probe,
+)
+from src.models import (
+    build_model,
+    count_trainable_parameters,
+    set_transfer_train_mode,
+    trainable_parameters,
+)
 from src.transforms import build_transforms
 from src.utils import load_config, project_root, set_seed
 
@@ -66,7 +78,10 @@ def overfit_one_batch(
     model.train()
     images = images.to(device)
     labels = labels.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    params = trainable_parameters(model)
+    if not params:
+        raise RuntimeError("Model has no trainable parameters.")
+    optimizer = torch.optim.Adam(params, lr=lr)
     criterion = nn.CrossEntropyLoss()
     losses: list[float] = []
     for _ in range(steps):
@@ -85,8 +100,9 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     amp: bool,
+    strategy: str,
 ) -> float:
-    model.train()
+    set_transfer_train_mode(model, strategy)
     criterion = nn.CrossEntropyLoss()
     scaler = torch.amp.GradScaler("cuda", enabled=amp)
     running = 0.0
@@ -125,13 +141,9 @@ def save_checkpoint(
     )
 
 
-def run_training(config: dict) -> dict:
-    set_seed(int(config["seed"]))
+def _prepare_data(config: dict):
     root = project_root()
     train_cfg = config["train"]
-    device = resolve_device(str(train_cfg.get("device", "auto")))
-    amp = bool(train_cfg.get("amp", False)) and device.type == "cuda"
-
     split_csv = root / config["paths"]["split_csv"]
     dataset_root = root / config["plantvillage"]["local_dir"]
     full_frame = pd.read_csv(split_csv)
@@ -140,9 +152,123 @@ def run_training(config: dict) -> dict:
         raise RuntimeError(
             f"Expected {config['expected_classes']} classes, found {len(class_names)}"
         )
-
     train_frame = load_split_frame(split_csv, "train")
     val_frame = load_split_frame(split_csv, "val")
+    return root, train_cfg, dataset_root, class_names, class_to_idx, train_frame, val_frame
+
+
+def run_frozen_feature_probe(config: dict) -> dict:
+    """Extract frozen ResNet features once, then train only the linear head."""
+    set_seed(int(config["seed"]))
+    root, train_cfg, dataset_root, class_names, class_to_idx, train_frame, val_frame = (
+        _prepare_data(config)
+    )
+    device = resolve_device(str(train_cfg.get("device", "auto")))
+    strategy = str(train_cfg.get("strategy", "frozen"))
+    if strategy != "frozen":
+        raise ValueError("cache_features only supports strategy=frozen.")
+
+    image_size = int(config["image"]["size"])
+    feature_batch = int(train_cfg.get("feature_batch_size", train_cfg["batch_size"]))
+    num_workers = int(train_cfg.get("num_workers", 0))
+    out_dir = root / train_cfg["output_dir"]
+    out_dir.mkdir(parents=True, exist_ok=True)
+    train_feat_path = out_dir / "train_features.pt"
+    val_feat_path = out_dir / "val_features.pt"
+
+    model = build_model(
+        str(train_cfg["model"]),
+        len(class_names),
+        strategy=strategy,
+    ).to(device)
+
+    if train_feat_path.exists() and val_feat_path.exists():
+        train_features, train_labels = load_feature_bank(train_feat_path)
+        val_features, val_labels = load_feature_bank(val_feat_path)
+    else:
+        extract_loader_train = make_loader(
+            train_frame,
+            dataset_root,
+            class_to_idx,
+            image_size,
+            feature_batch,
+            train=False,
+            num_workers=num_workers,
+        )
+        extract_loader_val = make_loader(
+            val_frame,
+            dataset_root,
+            class_to_idx,
+            image_size,
+            feature_batch,
+            train=False,
+            num_workers=num_workers,
+        )
+        train_features, train_labels = extract_features(
+            model, extract_loader_train, device
+        )
+        val_features, val_labels = extract_features(model, extract_loader_val, device)
+        save_feature_bank(train_feat_path, train_features, train_labels)
+        save_feature_bank(val_feat_path, val_features, val_labels)
+
+    probe_train = feature_loader(
+        train_features,
+        train_labels,
+        batch_size=int(train_cfg["batch_size"]),
+        shuffle=True,
+    )
+    probe_val = feature_loader(
+        val_features,
+        val_labels,
+        batch_size=int(train_cfg["batch_size"]),
+        shuffle=False,
+    )
+    head, history = train_linear_probe(
+        num_features=int(train_features.shape[1]),
+        num_classes=len(class_names),
+        train_loader=probe_train,
+        val_loader=probe_val,
+        device=device,
+        epochs=int(train_cfg["epochs"]),
+        lr=float(train_cfg["lr"]),
+    )
+    model.fc.load_state_dict(head.state_dict())
+    best_metrics = max(history, key=lambda row: row["macro_f1"])
+    best_path = out_dir / "best.pt"
+    save_checkpoint(best_path, model, class_names, config, best_metrics)
+
+    summary = {
+        "best_checkpoint": str(best_path.relative_to(root).as_posix()),
+        "best_macro_f1": best_metrics["macro_f1"],
+        "best_metrics": best_metrics,
+        "history": history,
+        "class_names": class_names,
+        "device": str(device),
+        "trainable_parameters": count_trainable_parameters(model),
+        "feature_dim": int(train_features.shape[1]),
+        "cache_features": True,
+        "strategy": strategy,
+    }
+    summary_path = out_dir / "summary.json"
+    summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    print(json.dumps(best_metrics, indent=2))
+    print(f"Wrote {summary_path}")
+    return summary
+
+
+def run_training(config: dict) -> dict:
+    train_cfg = config["train"]
+    strategy = str(train_cfg.get("strategy", "full"))
+    if bool(train_cfg.get("cache_features", False)):
+        return run_frozen_feature_probe(config)
+
+    set_seed(int(config["seed"]))
+    root, train_cfg, dataset_root, class_names, class_to_idx, train_frame, val_frame = (
+        _prepare_data(config)
+    )
+    device = resolve_device(str(train_cfg.get("device", "auto")))
+    amp = bool(train_cfg.get("amp", False)) and device.type == "cuda"
+
     image_size = int(config["image"]["size"])
     batch_size = int(train_cfg["batch_size"])
     num_workers = int(train_cfg.get("num_workers", 0))
@@ -166,31 +292,47 @@ def run_training(config: dict) -> dict:
         num_workers=num_workers,
     )
 
-    model = build_model(str(train_cfg["model"]), len(class_names)).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=float(train_cfg["lr"]))
+    model = build_model(
+        str(train_cfg["model"]),
+        len(class_names),
+        strategy=strategy,
+    ).to(device)
+    params = trainable_parameters(model)
+    if not params:
+        raise RuntimeError("Model has no trainable parameters.")
+    optimizer = torch.optim.Adam(params, lr=float(train_cfg["lr"]))
     out_dir = root / train_cfg["output_dir"]
     out_dir.mkdir(parents=True, exist_ok=True)
 
     history: list[dict] = []
     best_macro = -1.0
     best_path = out_dir / "best.pt"
+    best_metrics: dict = {}
 
     for epoch in range(1, int(train_cfg["epochs"]) + 1):
-        train_loss = train_one_epoch(model, train_loader, optimizer, device, amp)
+        train_loss = train_one_epoch(
+            model, train_loader, optimizer, device, amp, strategy
+        )
+        model.eval()
         val_metrics = evaluate_loader(model, val_loader, device, len(class_names))
         row = {"epoch": epoch, "train_loss": train_loss, **val_metrics}
         history.append(row)
         print(json.dumps(row, indent=2))
         if val_metrics["macro_f1"] > best_macro:
             best_macro = val_metrics["macro_f1"]
+            best_metrics = val_metrics
             save_checkpoint(best_path, model, class_names, config, val_metrics)
 
     summary = {
         "best_checkpoint": str(best_path.relative_to(root).as_posix()),
         "best_macro_f1": best_macro,
+        "best_metrics": best_metrics,
         "history": history,
         "class_names": class_names,
         "device": str(device),
+        "trainable_parameters": count_trainable_parameters(model),
+        "cache_features": False,
+        "strategy": strategy,
     }
     summary_path = out_dir / "summary.json"
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
@@ -218,7 +360,12 @@ def run_overfit(config: dict) -> dict:
         num_workers=0,
     )
     images, labels = next(iter(loader))
-    model = build_model(str(train_cfg["model"]), len(class_names)).to(device)
+    strategy = str(train_cfg.get("strategy", "full"))
+    model = build_model(
+        str(train_cfg["model"]),
+        len(class_names),
+        strategy=strategy,
+    ).to(device)
     losses = overfit_one_batch(
         model,
         images,
@@ -233,6 +380,7 @@ def run_overfit(config: dict) -> dict:
         "steps": len(losses),
         "batch_size": int(labels.size(0)),
         "unique_labels": sorted({int(x) for x in labels.tolist()}),
+        "trainable_parameters": count_trainable_parameters(model),
     }
     out_dir = root / train_cfg["output_dir"]
     out_dir.mkdir(parents=True, exist_ok=True)

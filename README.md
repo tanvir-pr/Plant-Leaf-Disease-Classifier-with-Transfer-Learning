@@ -51,6 +51,21 @@ Outputs:
 - `runs/scratch_cnn/best.pt`
 - `runs/scratch_cnn/summary.json`
 
+## Frozen ResNet-50
+
+ImageNet-pretrained ResNet-50 with a frozen backbone and a new linear head. Features are extracted once, then the head is trained on the validation split metrics only.
+
+```bash
+python -m src.train --config configs/resnet50_frozen.yaml
+```
+
+Outputs:
+
+- `runs/resnet50_frozen/train_features.pt`
+- `runs/resnet50_frozen/val_features.pt`
+- `runs/resnet50_frozen/best.pt`
+- `runs/resnet50_frozen/summary.json`
+
 ## Tests
 
 ```bash
