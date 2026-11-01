@@ -1,0 +1,19 @@
+seed: 42
+
+# Leaf-grouped split. Test is held out for the single final evaluation.
+split:
+  train: 0.70
+  val: 0.15
+  test: 0.15
+
+plantvillage:
+  repo_url: https://github.com/spMohanty/PlantVillage-Dataset.git
+  local_dir: data/raw/PlantVillage-Dataset
+  color_subdir: raw/color
+  leaf_map: leaf_grouping/leaf-map.json
+
+expected_classes: 38
+
+image:
+  size: 224
+  normalize: imagenet
