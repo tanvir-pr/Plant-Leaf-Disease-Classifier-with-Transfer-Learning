@@ -10,7 +10,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Preparing the plant images uses NumPy, pandas, matplotlib, scikit-learn, and PyYAML.
+Preparing the plant images uses NumPy, pandas, matplotlib, scikit-learn, and PyYAML. Training uses PyTorch and torchvision.
 
 ## PlantVillage
 
@@ -33,6 +33,23 @@ Outputs:
 The split is 70% train, 15% val, 15% test, seed 42. Photos of the same physical leaf stay in one split. Groups are stratified by disease class, so a near-duplicate cannot leak into test. The test split is held out for a single evaluation.
 
 The published leaf map covers 31 of the 38 classes. When a file uses a different lab code than the map but the same photo number, that number is used if it belongs to exactly one leaf of that class. Corn, squash, healthy grape, and tomato mosaic virus have no leaf ids in the map, so those photos are grouped by their own file id. A `copy` file stays with the original.
+
+## Scratch CNN baseline
+
+Inspect one training batch, overfit that batch as a sanity check, then train the small CNN from random weights. Metrics are reported on the validation split only.
+
+```bash
+python scripts/visualize_batch.py
+python -m src.train --overfit-batch
+python -m src.train
+```
+
+Outputs:
+
+- `reports/figures/plant_train_batch.png`
+- `runs/scratch_cnn/overfit.json`
+- `runs/scratch_cnn/best.pt`
+- `runs/scratch_cnn/summary.json`
 
 ## Tests
 

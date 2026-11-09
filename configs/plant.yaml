@@ -1,6 +1,6 @@
 seed: 42
 
-# Leaf-grouped split. Test is held out for the single final evaluation.
+# Leaf-grouped split. Test is held out for a single evaluation.
 split:
   train: 0.70
   val: 0.15
@@ -12,8 +12,23 @@ plantvillage:
   color_subdir: raw/color
   leaf_map: leaf_grouping/leaf-map.json
 
+paths:
+  split_csv: data/splits/plant_split.csv
+
 expected_classes: 38
 
 image:
   size: 224
   normalize: imagenet
+
+train:
+  model: scratch_cnn
+  epochs: 3
+  batch_size: 32
+  lr: 0.001
+  num_workers: 0
+  device: auto
+  amp: true
+  output_dir: runs/scratch_cnn
+  overfit_steps: 80
+  overfit_lr: 0.001
