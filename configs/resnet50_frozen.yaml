@@ -1,0 +1,36 @@
+seed: 42
+
+split:
+  train: 0.70
+  val: 0.15
+  test: 0.15
+
+plantvillage:
+  repo_url: https://github.com/spMohanty/PlantVillage-Dataset.git
+  local_dir: data/raw/PlantVillage-Dataset
+  color_subdir: raw/color
+  leaf_map: leaf_grouping/leaf-map.json
+
+paths:
+  split_csv: data/splits/plant_split.csv
+
+expected_classes: 38
+
+image:
+  size: 224
+  normalize: imagenet
+
+train:
+  model: resnet50
+  strategy: frozen
+  cache_features: true
+  epochs: 20
+  batch_size: 64
+  feature_batch_size: 16
+  lr: 0.001
+  num_workers: 0
+  device: auto
+  amp: true
+  output_dir: runs/resnet50_frozen
+  overfit_steps: 60
+  overfit_lr: 0.001

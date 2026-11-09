@@ -23,6 +23,8 @@ image:
 
 train:
   model: scratch_cnn
+  strategy: full
+  cache_features: false
   epochs: 3
   batch_size: 32
   lr: 0.001

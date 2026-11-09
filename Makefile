@@ -1,4 +1,4 @@
-.PHONY: download-plant eda visualize-batch overfit train-scratch test
+.PHONY: download-plant eda visualize-batch overfit train-scratch train-resnet-frozen test
 
 download-plant:
 	python data/download_plantvillage.py
@@ -14,6 +14,9 @@ overfit:
 
 train-scratch:
 	python -m src.train
+
+train-resnet-frozen:
+	python -m src.train --config configs/resnet50_frozen.yaml
 
 test:
 	python -m pytest -q
