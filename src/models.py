@@ -5,7 +5,9 @@ from __future__ import annotations
 import torch
 from torch import nn
 from torchvision import models
-from torchvision.models import ResNet50_Weights
+from torchvision.models import (
+    ResNet50_Weights,
+)
 
 
 class ScratchCNN(nn.Module):
@@ -56,46 +58,118 @@ def trainable_parameters(model: nn.Module):
     return [param for param in model.parameters() if param.requires_grad]
 
 
+def classifier_prefix(model: nn.Module) -> str:
+    if hasattr(model, "fc"):
+        return "fc."
+    if hasattr(model, "classifier"):
+        return "classifier."
+    raise ValueError("Model has no fc or classifier head.")
+
+
+def classifier_module(model: nn.Module) -> nn.Module:
+    if hasattr(model, "fc"):
+        return model.fc
+    if hasattr(model, "classifier"):
+        return model.classifier
+    raise ValueError("Model has no fc or classifier head.")
+
+
+def last_block_module(model: nn.Module) -> nn.Module:
+    if hasattr(model, "layer4"):
+        return model.layer4
+    if hasattr(model, "features"):
+        # EfficientNet / MobileNet: unfreeze the final feature stage.
+        return model.features[-1]
+    raise ValueError("Model has no last-block module.")
+
+
+def build_optimizer_param_groups(
+    model: nn.Module,
+    strategy: str,
+    head_lr: float,
+    backbone_lr: float | None = None,
+) -> list[dict]:
+    """Lower learning rate for pretrained layers, higher for the new head."""
+    key = strategy.lower().replace("-", "_")
+    backbone_lr = head_lr if backbone_lr is None else backbone_lr
+
+    if isinstance(model, ScratchCNN) or key == "frozen":
+        params = trainable_parameters(model)
+        if not params:
+            raise RuntimeError("Model has no trainable parameters.")
+        return [{"params": params, "lr": head_lr}]
+
+    prefix = classifier_prefix(model)
+    head_params = [
+        param
+        for name, param in model.named_parameters()
+        if param.requires_grad and name.startswith(prefix)
+    ]
+    if key == "last_block":
+        block = last_block_module(model)
+        backbone_params = [param for param in block.parameters() if param.requires_grad]
+    else:
+        backbone_params = [
+            param
+            for name, param in model.named_parameters()
+            if param.requires_grad and not name.startswith(prefix)
+        ]
+
+    groups: list[dict] = []
+    if backbone_params:
+        groups.append({"params": backbone_params, "lr": backbone_lr})
+    if head_params:
+        groups.append({"params": head_params, "lr": head_lr})
+    if not groups:
+        raise RuntimeError("Model has no trainable parameters.")
+    return groups
+
+
 def apply_freeze_strategy(model: nn.Module, strategy: str) -> nn.Module:
     """Freeze pretrained layers for transfer learning.
 
     Strategies:
     - frozen: train only the final classifier
-    - last_block: train layer4 and the classifier
+    - last_block: train the last feature block and the classifier
     - full: train every parameter
     """
     key = strategy.lower().replace("-", "_")
     if key not in {"frozen", "last_block", "full"}:
         raise ValueError(f"Unknown freeze strategy: {strategy}")
 
-    if not hasattr(model, "fc"):
-        raise ValueError("Freeze helpers expect a model with an fc classifier.")
-
+    head = classifier_module(model)
     set_trainable(model, True)
     if key == "full":
         return model
 
     set_trainable(model, False)
-    set_trainable(model.fc, True)
+    set_trainable(head, True)
     if key == "last_block":
-        set_trainable(model.layer4, True)
+        set_trainable(last_block_module(model), True)
     return model
 
 
 def set_transfer_train_mode(model: nn.Module, strategy: str) -> None:
     """Keep frozen BatchNorm layers in eval so their running stats stay fixed."""
+    if isinstance(model, ScratchCNN):
+        model.train()
+        return
+
     key = strategy.lower().replace("-", "_")
     if key == "full":
         model.train()
         return
+
     model.train()
+    head = classifier_module(model)
     if key == "frozen":
         model.eval()
-        model.fc.train()
+        head.train()
         return
+
     model.eval()
-    model.layer4.train()
-    model.fc.train()
+    last_block_module(model).train()
+    head.train()
 
 
 def build_resnet50(

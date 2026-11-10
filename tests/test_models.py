@@ -7,6 +7,7 @@ from src.models import (
     ScratchCNN,
     apply_freeze_strategy,
     build_model,
+    build_optimizer_param_groups,
     count_trainable_parameters,
 )
 
@@ -68,6 +69,24 @@ def test_apply_freeze_rejects_unknown_strategy():
     except ValueError:
         raised = True
     assert raised
+
+
+def test_discriminative_lr_groups_for_last_block():
+    model = build_model(
+        "resnet50",
+        num_classes=38,
+        strategy="last_block",
+        pretrained=False,
+    )
+    groups = build_optimizer_param_groups(
+        model,
+        strategy="last_block",
+        head_lr=1e-3,
+        backbone_lr=1e-4,
+    )
+    assert len(groups) == 2
+    assert groups[0]["lr"] == 1e-4
+    assert groups[1]["lr"] == 1e-3
 
 
 def test_classification_metrics_include_topk():

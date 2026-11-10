@@ -28,6 +28,7 @@ from src.features import (
 )
 from src.models import (
     build_model,
+    build_optimizer_param_groups,
     count_trainable_parameters,
     set_transfer_train_mode,
     trainable_parameters,
@@ -297,10 +298,15 @@ def run_training(config: dict) -> dict:
         len(class_names),
         strategy=strategy,
     ).to(device)
-    params = trainable_parameters(model)
-    if not params:
-        raise RuntimeError("Model has no trainable parameters.")
-    optimizer = torch.optim.Adam(params, lr=float(train_cfg["lr"]))
+    head_lr = float(train_cfg["lr"])
+    backbone_lr = float(train_cfg.get("backbone_lr", head_lr))
+    param_groups = build_optimizer_param_groups(
+        model,
+        strategy=strategy,
+        head_lr=head_lr,
+        backbone_lr=backbone_lr,
+    )
+    optimizer = torch.optim.Adam(param_groups)
     out_dir = root / train_cfg["output_dir"]
     out_dir.mkdir(parents=True, exist_ok=True)
 
