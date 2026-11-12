@@ -6,6 +6,8 @@ import torch
 from torch import nn
 from torchvision import models
 from torchvision.models import (
+    EfficientNet_B0_Weights,
+    MobileNet_V2_Weights,
     ResNet50_Weights,
 )
 
@@ -185,6 +187,34 @@ def build_resnet50(
     return apply_freeze_strategy(model, strategy)
 
 
+def build_efficientnet_b0(
+    num_classes: int,
+    strategy: str = "full",
+    pretrained: bool = True,
+) -> nn.Module:
+    if num_classes < 2:
+        raise ValueError("num_classes must be at least 2.")
+    weights = EfficientNet_B0_Weights.IMAGENET1K_V1 if pretrained else None
+    model = models.efficientnet_b0(weights=weights)
+    in_features = model.classifier[-1].in_features
+    model.classifier[-1] = nn.Linear(in_features, num_classes)
+    return apply_freeze_strategy(model, strategy)
+
+
+def build_mobilenet_v2(
+    num_classes: int,
+    strategy: str = "full",
+    pretrained: bool = True,
+) -> nn.Module:
+    if num_classes < 2:
+        raise ValueError("num_classes must be at least 2.")
+    weights = MobileNet_V2_Weights.IMAGENET1K_V2 if pretrained else None
+    model = models.mobilenet_v2(weights=weights)
+    in_features = model.classifier[-1].in_features
+    model.classifier[-1] = nn.Linear(in_features, num_classes)
+    return apply_freeze_strategy(model, strategy)
+
+
 def build_model(
     name: str,
     num_classes: int,
@@ -196,6 +226,18 @@ def build_model(
         return ScratchCNN(num_classes)
     if key in {"resnet50", "resnet_50"}:
         return build_resnet50(
+            num_classes,
+            strategy=strategy,
+            pretrained=pretrained,
+        )
+    if key in {"efficientnet_b0", "efficientnetb0"}:
+        return build_efficientnet_b0(
+            num_classes,
+            strategy=strategy,
+            pretrained=pretrained,
+        )
+    if key in {"mobilenet_v2", "mobilenetv2"}:
+        return build_mobilenet_v2(
             num_classes,
             strategy=strategy,
             pretrained=pretrained,

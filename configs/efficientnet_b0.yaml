@@ -1,0 +1,35 @@
+seed: 42
+
+split:
+  train: 0.70
+  val: 0.15
+  test: 0.15
+
+plantvillage:
+  repo_url: https://github.com/spMohanty/PlantVillage-Dataset.git
+  local_dir: data/raw/PlantVillage-Dataset
+  color_subdir: raw/color
+  leaf_map: leaf_grouping/leaf-map.json
+
+paths:
+  split_csv: data/splits/plant_split.csv
+
+expected_classes: 38
+
+image:
+  size: 224
+  normalize: imagenet
+
+train:
+  model: efficientnet_b0
+  strategy: full
+  augmentation: flip
+  cache_features: false
+  epochs: 2
+  batch_size: 32
+  lr: 0.001
+  backbone_lr: 0.0001
+  num_workers: 2
+  device: cuda
+  amp: true
+  output_dir: runs/efficientnet_b0

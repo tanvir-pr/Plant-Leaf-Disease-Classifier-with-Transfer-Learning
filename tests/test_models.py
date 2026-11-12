@@ -18,6 +18,19 @@ def test_scratch_cnn_output_shape():
     assert logits.shape == (4, 38)
 
 
+def test_scratch_cnn_forward_is_deterministic_in_eval():
+    torch.manual_seed(0)
+    model = ScratchCNN(num_classes=8)
+    model.eval()
+    x = torch.randn(2, 3, 224, 224)
+    with torch.no_grad():
+        a = model(x)
+        b = model(x)
+    assert torch.allclose(a, b)
+    assert a.shape == (2, 8)
+    assert torch.isfinite(a).all()
+
+
 def test_build_model_scratch_alias():
     model = build_model("scratch_cnn", num_classes=38)
     assert isinstance(model, ScratchCNN)
@@ -87,6 +100,31 @@ def test_discriminative_lr_groups_for_last_block():
     assert len(groups) == 2
     assert groups[0]["lr"] == 1e-4
     assert groups[1]["lr"] == 1e-3
+
+
+def test_efficientnet_b0_output_shape_and_head():
+    model = build_model(
+        "efficientnet_b0",
+        num_classes=38,
+        strategy="full",
+        pretrained=False,
+    )
+    logits = model(torch.randn(2, 3, 224, 224))
+    assert logits.shape == (2, 38)
+    trainable = [name for name, param in model.named_parameters() if param.requires_grad]
+    assert any(name.startswith("classifier.") for name in trainable)
+
+
+def test_mobilenet_v2_frozen_trains_classifier_only():
+    model = build_model(
+        "mobilenet_v2",
+        num_classes=38,
+        strategy="frozen",
+        pretrained=False,
+    )
+    trainable = [name for name, param in model.named_parameters() if param.requires_grad]
+    assert trainable
+    assert all(name.startswith("classifier.") for name in trainable)
 
 
 def test_classification_metrics_include_topk():
