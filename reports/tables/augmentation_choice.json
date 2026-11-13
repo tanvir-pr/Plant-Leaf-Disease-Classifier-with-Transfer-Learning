@@ -1,0 +1,6 @@
+{
+  "best_augmentation": "color_jitter",
+  "macro_f1": 0.9861308283572271,
+  "accuracy": 0.9895452827812067,
+  "best_checkpoint": "runs/aug_color_jitter/best.pt"
+}

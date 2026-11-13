@@ -51,12 +51,17 @@ def make_loader(
     batch_size: int,
     train: bool,
     num_workers: int,
+    augmentation: str = "flip",
 ) -> DataLoader:
     dataset = PlantSplitDataset(
         frame,
         dataset_root=dataset_root,
         class_to_idx=class_to_idx,
-        transform=build_transforms(image_size, train=train),
+        transform=build_transforms(
+            image_size,
+            train=train,
+            augmentation=augmentation if train else "none",
+        ),
     )
     return DataLoader(
         dataset,
@@ -245,6 +250,7 @@ def run_frozen_feature_probe(config: dict) -> dict:
         "history": history,
         "class_names": class_names,
         "device": str(device),
+        "model": str(train_cfg["model"]),
         "trainable_parameters": count_trainable_parameters(model),
         "feature_dim": int(train_features.shape[1]),
         "cache_features": True,
@@ -273,6 +279,7 @@ def run_training(config: dict) -> dict:
     image_size = int(config["image"]["size"])
     batch_size = int(train_cfg["batch_size"])
     num_workers = int(train_cfg.get("num_workers", 0))
+    augmentation = str(train_cfg.get("augmentation", "flip"))
 
     train_loader = make_loader(
         train_frame,
@@ -282,6 +289,7 @@ def run_training(config: dict) -> dict:
         batch_size,
         train=True,
         num_workers=num_workers,
+        augmentation=augmentation,
     )
     val_loader = make_loader(
         val_frame,
@@ -291,6 +299,7 @@ def run_training(config: dict) -> dict:
         batch_size,
         train=False,
         num_workers=num_workers,
+        augmentation="none",
     )
 
     model = build_model(
@@ -336,9 +345,13 @@ def run_training(config: dict) -> dict:
         "history": history,
         "class_names": class_names,
         "device": str(device),
+        "model": str(train_cfg["model"]),
         "trainable_parameters": count_trainable_parameters(model),
         "cache_features": False,
         "strategy": strategy,
+        "augmentation": augmentation,
+        "head_lr": head_lr,
+        "backbone_lr": backbone_lr,
     }
     summary_path = out_dir / "summary.json"
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
