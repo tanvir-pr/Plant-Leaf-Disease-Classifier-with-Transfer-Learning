@@ -1,0 +1,23 @@
+{
+  "checkpoint": "runs/aug_color_jitter/best.pt",
+  "device": "cuda",
+  "n_correct": 6,
+  "n_wrong": 6,
+  "correct_indices": [
+    4708,
+    4711,
+    4713,
+    4,
+    806,
+    759
+  ],
+  "wrong_indices": [
+    62,
+    6786,
+    6124,
+    6368,
+    1281,
+    6752
+  ],
+  "val_accuracy": 0.9895452827812067
+}
