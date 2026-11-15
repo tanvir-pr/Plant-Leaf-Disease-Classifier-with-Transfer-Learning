@@ -18,6 +18,7 @@ class PlantSplitDataset(Dataset):
         dataset_root: Path,
         class_to_idx: dict[str, int],
         transform=None,
+        preprocess=None,
     ) -> None:
         if frame.empty:
             raise ValueError("Split frame has no rows.")
@@ -28,6 +29,7 @@ class PlantSplitDataset(Dataset):
         self.dataset_root = Path(dataset_root)
         self.class_to_idx = class_to_idx
         self.transform = transform
+        self.preprocess = preprocess
 
     def __len__(self) -> int:
         return len(self.frame)
@@ -36,6 +38,8 @@ class PlantSplitDataset(Dataset):
         row = self.frame.iloc[index]
         path = self.dataset_root / row["relative_path"]
         image = Image.open(path).convert("RGB")
+        if self.preprocess is not None:
+            image = self.preprocess(image)
         label = self.class_to_idx[str(row["class_name"])]
         if self.transform is not None:
             image = self.transform(image)

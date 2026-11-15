@@ -1,0 +1,43 @@
+{
+  "checkpoint": "runs/aug_color_jitter/best.pt",
+  "device": "cuda",
+  "results": [
+    {
+      "variant": "original",
+      "accuracy": 0.9895452827812067,
+      "macro_f1": 0.9861308283572271,
+      "top3": 0.9997480791031617,
+      "top5": 1.0,
+      "loss": 0.02835727619294041
+    },
+    {
+      "variant": "masked_black",
+      "accuracy": 0.9778309610782214,
+      "macro_f1": 0.9742281608612111,
+      "top3": 0.9982365537221313,
+      "top5": 0.9994961582063232,
+      "loss": 0.0734543790572772
+    },
+    {
+      "variant": "cropped_leaf",
+      "accuracy": 0.9780828819750599,
+      "macro_f1": 0.9743325252500532,
+      "top3": 0.9978586723768736,
+      "top5": 0.9994961582063232,
+      "loss": 0.07402715731824214
+    }
+  ],
+  "drops": [
+    {
+      "variant": "masked_black",
+      "macro_f1_drop": 0.011902667496015984,
+      "accuracy_drop": 0.011714321702985253
+    },
+    {
+      "variant": "cropped_leaf",
+      "macro_f1_drop": 0.01179830310717389,
+      "accuracy_drop": 0.0114624008061468
+    }
+  ],
+  "finding": "Removing the lab background barely changes validation score. The model appears to rely mainly on the leaf itself."
+}
