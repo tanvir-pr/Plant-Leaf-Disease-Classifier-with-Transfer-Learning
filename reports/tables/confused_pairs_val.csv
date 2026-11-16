@@ -1,0 +1,33 @@
+true_name,pred_name,count,same_crop
+Corn_(maize)___Northern_Leaf_Blight,Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot,8,True
+Tomato___Target_Spot,Tomato___Septoria_leaf_spot,7,True
+Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot,Corn_(maize)___Northern_Leaf_Blight,6,True
+Tomato___Late_blight,Potato___Late_blight,6,False
+Tomato___Septoria_leaf_spot,Tomato___Bacterial_spot,5,True
+Apple___Apple_scab,Apple___healthy,4,True
+Tomato___Early_blight,Tomato___Late_blight,4,True
+Tomato___Target_Spot,Tomato___Early_blight,4,True
+Grape___Esca_(Black_Measles),Grape___Black_rot,3,True
+"Pepper,_bell___Bacterial_spot","Pepper,_bell___healthy",3,True
+Tomato___Spider_mites Two-spotted_spider_mite,Tomato___Target_Spot,3,True
+Tomato___Target_Spot,Tomato___Bacterial_spot,3,True
+Tomato___Target_Spot,Tomato___Spider_mites Two-spotted_spider_mite,3,True
+Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot,Corn_(maize)___Common_rust_,2,True
+Corn_(maize)___Northern_Leaf_Blight,Corn_(maize)___Common_rust_,2,True
+Potato___Late_blight,Tomato___Late_blight,2,False
+Tomato___Early_blight,Tomato___Septoria_leaf_spot,2,True
+Tomato___Late_blight,Tomato___Early_blight,2,True
+Apple___healthy,Apple___Apple_scab,1,True
+Blueberry___healthy,Cherry_(including_sour)___Powdery_mildew,1,False
+Potato___Late_blight,Potato___healthy,1,True
+Soybean___healthy,Corn_(maize)___healthy,1,False
+Soybean___healthy,Raspberry___healthy,1,False
+Tomato___Early_blight,Apple___Apple_scab,1,False
+Tomato___Early_blight,Tomato___Spider_mites Two-spotted_spider_mite,1,True
+Tomato___Early_blight,Tomato___Target_Spot,1,True
+Tomato___Early_blight,Tomato___Tomato_mosaic_virus,1,True
+Tomato___Late_blight,Tomato___Septoria_leaf_spot,1,True
+Tomato___Leaf_Mold,Tomato___Septoria_leaf_spot,1,True
+Tomato___Leaf_Mold,Tomato___Tomato_Yellow_Leaf_Curl_Virus,1,True
+Tomato___Tomato_Yellow_Leaf_Curl_Virus,Orange___Haunglongbing_(Citrus_greening),1,False
+Tomato___Tomato_Yellow_Leaf_Curl_Virus,Tomato___Bacterial_spot,1,True
