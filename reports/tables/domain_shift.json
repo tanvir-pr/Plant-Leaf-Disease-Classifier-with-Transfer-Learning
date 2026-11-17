@@ -1,0 +1,18 @@
+{
+  "checkpoint": "runs/aug_color_jitter/best.pt",
+  "device": "cuda",
+  "source": "proxy_field",
+  "lab_metrics": {
+    "accuracy": 0.9895452827812067,
+    "macro_f1": 0.9861308283572271,
+    "n_images": 7939
+  },
+  "own_metrics": {
+    "accuracy": 0.9166666666666666,
+    "macro_f1": 0.8888888888888888,
+    "n_images": 24
+  },
+  "accuracy_drop": 0.07287861611454005,
+  "macro_f1_drop": 0.09724193946833826,
+  "finding": "Field-style / own-leaf macro-F1 drops by 0.097 (acc drop 0.073) versus lab validation. Lighting, background, and phone artifacts break the lab-trained model. Images used here are synthetic field-style proxies from train leaves; replace data/own_leaves/ with real phone photos for the final write-up."
+}

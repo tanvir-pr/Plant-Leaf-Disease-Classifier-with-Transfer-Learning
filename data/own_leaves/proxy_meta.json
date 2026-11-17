@@ -1,0 +1,6 @@
+{
+  "n_images": 24,
+  "source": "proxy_field",
+  "note": "Synthetic field-style proxies built from PlantVillage train leaves (outdoor backdrop + phone lighting/JPEG). Replace with real photos in data/own_leaves/ and update labels.csv when available.",
+  "labels_csv": "data/own_leaves/labels.csv"
+}
