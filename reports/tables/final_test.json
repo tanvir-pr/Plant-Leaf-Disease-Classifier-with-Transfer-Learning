@@ -1,0 +1,22 @@
+{
+  "locked": true,
+  "evaluated_at_utc": "2026-11-22T15:08:36.525301+00:00",
+  "checkpoint": "runs/aug_color_jitter/best.pt",
+  "device": "cuda",
+  "split": "test",
+  "n_images": 8234,
+  "n_classes": 38,
+  "seed": 42,
+  "metrics": {
+    "accuracy": 0.9916201117318436,
+    "macro_f1": 0.9872818717436056,
+    "top3": 1.0,
+    "top5": 1.0,
+    "loss": 0.025944896425739952
+  },
+  "val_reference": {
+    "accuracy": 0.9895452827812067,
+    "macro_f1": 0.9861308283572271
+  },
+  "note": "Held-out test scored once. Do not re-run to tune the model. These numbers are the locked plant-chapter result."
+}

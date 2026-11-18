@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import torch
 from torch import nn
@@ -9,6 +11,21 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from src.metrics import classification_metrics
+
+
+class HeldOutAlreadyEvaluatedError(RuntimeError):
+    """Raised when the locked held-out test result already exists."""
+
+
+def assert_test_unlocked(lock_path: Path, force: bool = False) -> None:
+    """Refuse a second held-out test run unless force=True."""
+    if force:
+        return
+    if Path(lock_path).is_file():
+        raise HeldOutAlreadyEvaluatedError(
+            f"Held-out test already recorded at {lock_path}. "
+            "Pass force=True only if you intentionally want to overwrite it."
+        )
 
 
 @torch.no_grad()
