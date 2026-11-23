@@ -1,0 +1,12 @@
+torch
+torchvision
+gradio>=4.0
+Pillow>=10.0
+numpy>=1.26
+pandas>=2.0
+PyYAML>=6.0
+tqdm>=4.66
+scikit-learn>=1.4
+opencv-python-headless>=4.9
+grad-cam>=1.5.0
+captum>=0.7
