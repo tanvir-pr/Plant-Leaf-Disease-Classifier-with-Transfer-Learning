@@ -8,9 +8,24 @@ Upload a leaf photo → get a disease class, confidence, and a Grad-CAM overlay 
 
 ---
 
+## Table of contents
+
+1. [Overview](#overview)
+2. [What we used (tech stack)](#what-we-used-tech-stack)
+3. [Dataset](#dataset)
+4. [What photos to test with](#what-photos-to-test-with)
+5. [Highlights](#highlights)
+6. [Results](#results-at-a-glance)
+7. [Figures](#figures)
+8. [Demo](#demo-gradio)
+9. [Setup & reproduce](#setup)
+10. [Limitations](#limitations)
+
+---
+
 ## Overview
 
-This project trains and audits CNN classifiers on [PlantVillage](https://github.com/spMohanty/PlantVillage-Dataset) color leaf photos (38 classes, 14 crops). The goal is not only a high lab score, but an honest pipeline:
+This project trains and audits CNN classifiers on **PlantVillage** color leaf photos. The goal is not only a high lab score, but an honest pipeline:
 
 | Stage | What we did |
 | --- | --- |
@@ -26,13 +41,109 @@ This project trains and audits CNN classifiers on [PlantVillage](https://github.
 
 ---
 
+## What we used (tech stack)
+
+| Area | Tools |
+| --- | --- |
+| **Language** | Python 3 |
+| **Deep learning** | PyTorch, torchvision (ResNet-50, EfficientNet-B0, MobileNetV2, custom Scratch CNN) |
+| **Training** | YAML configs, TensorBoard, AdamW / discriminative LR, ImageNet-pretrained weights |
+| **Data** | Pillow, OpenCV, Albumentations / torchvision transforms, pandas |
+| **Metrics** | scikit-learn (accuracy, macro-F1, top-k), custom evaluation lock |
+| **Explainability** | pytorch-grad-cam, Captum (Grad-CAM / Grad-CAM++ / SmoothGrad) |
+| **Demo** | Gradio (upload → class + confidence + CAM + uncertainty) |
+| **Tests** | pytest |
+| **Deploy (optional)** | Hugging Face Hub / Space package in `hf_space/` |
+
+Core idea: **transfer learning** on lab leaf photos, then check whether the model looks at the leaf (not the background) and how hard it fails on phone-style images.
+
+---
+
+## Dataset
+
+| Item | Detail |
+| --- | --- |
+| **Name** | [PlantVillage Dataset](https://github.com/spMohanty/PlantVillage-Dataset) (`raw/color`) |
+| **Paper** | Mohanty, Hughes & Salathé, *Using Deep Learning for Image-Based Plant Disease Detection*, Frontiers in Plant Science, 2016 |
+| **Images** | **54,305** RGB leaf photos |
+| **Classes** | **38** (healthy + disease labels) |
+| **Crops** | **14** plant types |
+| **Look** | Mostly single leaf, plain / grey lab background, controlled lighting |
+| **Split** | **70% train / 15% val / 15% test**, seed **42**, grouped by **leaf id** (no near-duplicate leak) |
+| **Counts** | train 38,132 · val 7,939 · test 8,234 |
+
+Images are **not** committed. Download and split:
+
+```bash
+python data/download_plantvillage.py
+python data/prepare_plant_split.py
+```
+
+### Crops covered (14)
+
+Apple · Blueberry · Cherry · Corn (maize) · Grape · Orange · Peach · Bell pepper · Potato · Raspberry · Soybean · Squash · Strawberry · Tomato
+
+### Example classes (38 total)
+
+| Crop | Example labels |
+| --- | --- |
+| Apple | Apple scab, Black rot, Cedar apple rust, healthy |
+| Corn | Gray leaf spot, Common rust, Northern leaf blight, healthy |
+| Potato | Early blight, Late blight, healthy |
+| Tomato | Bacterial spot, Early/Late blight, Leaf mold, Septoria, Spider mites, Target spot, YLCV, Mosaic virus, healthy |
+| Others | Blueberry healthy, Grape black rot / Esca / blight, Orange HLB, Peach bacterial spot, Pepper bacterial spot, Soybean healthy, Squash powdery mildew, Strawberry leaf scorch, … |
+
+Full label list: `data/splits/plant_split.csv` (column `class_name`).
+
+---
+
+## What photos to test with
+
+The model was trained on **PlantVillage-style** images. Demo and domain-shift results depend heavily on photo type.
+
+### Best (high confidence expected)
+
+| Do this | Why |
+| --- | --- |
+| **One leaf** filling most of the frame | Matches training distribution |
+| **Plain background** (paper, desk, wall) | Less background shortcut / clutter |
+| **Sharp focus**, leaf flat / facing camera | Disease spots stay visible |
+| **Crop from PlantVillage** (tomato, corn, potato, apple, …) | Class exists in the 38 labels |
+| Use Gradio preprocess **Crop to leaf** for phone shots | Brings field photos closer to lab style |
+
+### Risky / often wrong (domain shift)
+
+| Avoid or treat as uncertain | Why |
+| --- | --- |
+| Whole plant / bush / fruit / multiple leaves | Model expects a single leaf |
+| Soil, grass, sky, hands, pots in frame | Out-of-distribution background |
+| Dark / yellow indoor light, heavy blur, JPEG noise | Lighting ≠ lab set |
+| Crops **not** in PlantVillage (mango, rice, rose, …) | No trained class → forced wrong guess |
+| Mixed diseases on one leaf | Labels assume one class per image |
+
+### How to test properly
+
+1. **Lab-style check** — take a few images from the held-out idea: clean single leaf of a known class (or use demo_test images). Expect high confidence.
+2. **Phone / own leaves** — put 20–30 real photos in `data/own_leaves/` + `labels.csv` (see `data/own_leaves/README.md`). Run `scripts/run_domain_shift.py`.
+3. **Gradio** — upload → read Top-5 + uncertainty flag. If Top-1 looks wrong but Top-2/3 show the right crop+disease, treat it as domain shift, not a broken app.
+4. **Do not** retune on the locked test split after peeking at scores.
+
+```text
+# own_leaves/labels.csv example
+relative_path,class_name,source
+my_tomato_01.jpg,Tomato___healthy,own
+my_apple_02.jpg,Apple___Apple_scab,own
+```
+
+---
+
 ## Highlights
 
 | | |
 | --- | --- |
-| **Dataset** | PlantVillage `raw/color` · 54,305 images · 38 classes |
-| **Split** | 70% train / 15% val / 15% test · seed 42 · leaf-id grouped |
-| **Winner** | `runs/aug_color_jitter/best.pt` |
+| **Dataset** | PlantVillage `raw/color` · 54,305 images · 38 classes · 14 crops |
+| **Split** | 70 / 15 / 15 · seed 42 · leaf-id grouped |
+| **Winner** | `runs/aug_color_jitter/best.pt` (EfficientNet-B0 + color jitter) |
 | **Locked test** | Acc **0.992** · macro-F1 **0.987** · top-3/5 **1.000** · *n* = 8,234 |
 | **Demo** | `python -m app.main` → http://127.0.0.1:7860 |
 
@@ -84,7 +195,7 @@ Re-running `scripts/run_final_test.py` refuses unless you pass `--force`.
 
 <p align="center">
   <img src="reports/figures/plant_train_batch.png" width="720" alt="Training batch sample" />
-  <br/><em>Sample training batch</em>
+  <br/><em>Sample training batch — what the model “expects”</em>
 </p>
 
 <p align="center">
@@ -101,7 +212,7 @@ Re-running `scripts/run_final_test.py` refuses unless you pass `--force`.
 <p align="center">
   <img src="reports/figures/shortcut_macro_f1.png" width="48%" alt="Shortcut test" />
   <img src="reports/figures/domain_shift_metrics.png" width="48%" alt="Domain shift" />
-  <br/><em>Background shortcut · Domain-shift drop</em>
+  <br/><em>Background shortcut · Domain-shift drop on field-style images</em>
 </p>
 
 ---
@@ -130,21 +241,21 @@ python -m app.main
 
 Open **http://127.0.0.1:7860**.
 
-The app returns:
+| Output | Meaning |
+| --- | --- |
+| Top-1 + confidence | Best guess among 38 classes |
+| Top-5 | Alternatives (check these if uncertain) |
+| Grad-CAM overlay | Where the model attended |
+| Preprocess: crop / mask / none | Helps phone photos look more like lab leaves |
+| Uncertainty flag | Low confidence or top-1 ≈ top-2 → do not trust alone |
 
-- Top-1 label + confidence  
-- Top-5 alternatives  
-- Grad-CAM overlay  
-- Optional leaf crop preprocess  
-- Uncertainty flag when confidence / margin is weak  
-
-Public temporary link (laptop must stay on):
+Temporary public link (laptop must stay on):
 
 ```bash
 python -m app.main --share
 ```
 
-Hugging Face model weights (if pushed): `tanvir-pr/plant-leaf-disease`. A free always-on Gradio Space usually needs **ZeroGPU** (or PRO for CPU Spaces).
+Optional Hub weights: `tanvir-pr/plant-leaf-disease`. Always-on free Space usually needs **ZeroGPU** (CPU Gradio Spaces often need PRO).
 
 ---
 
@@ -158,21 +269,13 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### Data (not committed)
+### How to reproduce
 
 ```bash
-python data/download_plantvillage.py   # raw/color + leaf-id map
-python data/prepare_plant_split.py     # leaf-grouped 70/15/15
-```
+# Data
+python data/download_plantvillage.py
+python data/prepare_plant_split.py
 
-Source: [spMohanty/PlantVillage-Dataset](https://github.com/spMohanty/PlantVillage-Dataset).  
-Cite: Mohanty, Hughes & Salathé, *Using Deep Learning for Image-Based Plant Disease Detection*, Frontiers in Plant Science, 2016.
-
----
-
-## How to reproduce
-
-```bash
 # Train / compare
 python -m src.train --config configs/resnet50_frozen.yaml
 python -m src.train --config configs/efficientnet_b0.yaml
@@ -188,13 +291,8 @@ python scripts/run_domain_shift.py
 # Locked test (once)
 python scripts/run_final_test.py
 
-# Demo
+# Demo + unit tests
 python -m app.main
-```
-
-Put real phone photos in `data/own_leaves/` with `labels.csv` to replace field-style proxies.
-
-```bash
 python -m pytest -q
 ```
 
